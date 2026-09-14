@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { createCar } from "./car.js";
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color("white");
@@ -24,10 +25,6 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
 
-// const axisHelper = new THREE.AxesHelper();
-// axisHelper.scale.set(3, 3, 3);
-// scene.add(axisHelper);
-
 //ambient light
 const ambientLight = new THREE.AmbientLight("orange", 2);
 scene.add(ambientLight);
@@ -48,10 +45,10 @@ ground.rotation.x = -Math.PI / 2;
 ground.position.y = -0.01;
 scene.add(ground);
 
-import { createCar } from "./car.js";
-
 // Instantiate car for Task 4
 const { car, wheels } = createCar();
+const { frontLeftWheel, frontRightWheel, rearLeftWheel, rearRightWheel } = wheels;
+
 car.position.set(0, 0, 0);
 car.scale.set(2.5, 2.5, 2.5);
 scene.add(car);
@@ -67,7 +64,6 @@ function animate() {
   frontRightWheel.rotation.y += 0.05;
   rearLeftWheel.rotation.y += 0.05;
   rearRightWheel.rotation.y += 0.05;
-  //   car.rotation.y += 0.05
 
   renderer.render(scene, camera);
 }
