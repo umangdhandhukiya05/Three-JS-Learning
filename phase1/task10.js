@@ -23,7 +23,7 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.2;
+renderer.toneMappingExposure = 1.4;
 document.body.appendChild(renderer.domElement);
 
 // Orbit controls
@@ -78,10 +78,50 @@ ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
 scene.add(ground);
 
-// Grid helper on floor
+// Floor reference grid
 const grid = new THREE.GridHelper(30, 30, 0x38bdf8, 0x1e293b);
 grid.position.y = 0.01;
 scene.add(grid);
+
+// 1. AxesHelper: Shows 3D coordinate system (Red = +X, Green = +Y, Blue = +Z)
+const axesHelper = new THREE.AxesHelper(6);
+axesHelper.position.y = 0.02;
+axesHelper.visible = window.innerWidth >= 768;
+scene.add(axesHelper);
+
+// 2. ArrowHelper: Visualizes the camera direction / normal vector of the drag plane
+const arrowHelper = new THREE.ArrowHelper(
+  new THREE.Vector3(0, 1, 0),
+  new THREE.Vector3(0, 0, 0),
+  3.0,
+  0xf43f5e,
+  0.6,
+  0.35,
+);
+arrowHelper.visible = false;
+scene.add(arrowHelper);
+
+// 3. Visual Drag Plane Mesh: Renders the actual 3D drag plane in the scene
+const dragPlaneGeo = new THREE.PlaneGeometry(24, 24, 12, 12);
+const dragPlaneMat = new THREE.MeshBasicMaterial({
+  color: 0x38bdf8,
+  transparent: true,
+  opacity: 0.12,
+  side: THREE.DoubleSide,
+  depthWrite: false,
+});
+const visualDragPlane = new THREE.Mesh(dragPlaneGeo, dragPlaneMat);
+const visualDragPlaneWire = new THREE.LineSegments(
+  new THREE.WireframeGeometry(dragPlaneGeo),
+  new THREE.LineBasicMaterial({
+    color: 0x38bdf8,
+    transparent: true,
+    opacity: 0.35,
+  }),
+);
+visualDragPlane.add(visualDragPlaneWire);
+visualDragPlane.visible = false;
+scene.add(visualDragPlane);
 
 // Interactive objects list
 const interactiveObjects = [];
@@ -112,31 +152,36 @@ function createInteractiveItem(geometry, color, x, z, name, type, description) {
   ring.position.y = 0.305;
   group.add(ring);
 
-  const mat = new THREE.MeshStandardMaterial({
-    color,
-    roughness: 0.2,
-    metalness: 0.8,
-    emissive: new THREE.Color(0x000000),
-  });
-  const mesh = new THREE.Mesh(geometry, mat);
-  mesh.position.y = 2.0;
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
+  if (geometry) {
+    const mat = new THREE.MeshStandardMaterial({
+      color,
+      roughness: 0.2,
+      metalness: 0.8,
+      emissive: new THREE.Color(0x000000),
+    });
+    const mesh = new THREE.Mesh(geometry, mat);
+    mesh.position.y = 2.0;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
 
-  mesh.userData = {
-    name,
-    type,
-    description,
-    baseColor: color,
-    baseY: 2.0,
-    ringMesh: ring,
-    isSelected: false,
-  };
+    mesh.userData = {
+      name,
+      type,
+      description,
+      baseColor: color,
+      baseY: 2.0,
+      ringMesh: ring,
+      isSelected: false,
+    };
 
-  group.add(mesh);
+    group.add(mesh);
+    interactiveObjects.push(mesh);
+    scene.add(group);
+    return mesh;
+  }
+
   scene.add(group);
-  interactiveObjects.push(mesh);
-  return mesh;
+  return group;
 }
 
 // 1. Cyber Cube (Top-Left Quadrant)
@@ -183,11 +228,23 @@ createInteractiveItem(
   "Dual-pyramid crystalline resonator with sharp geometric facets.",
 );
 
-// Raycasting setup
+// Center Platform & Ring (no floating object)
+createInteractiveItem(null, 0xffffff, 0, 0);
+
+// Dragging and Raycasting state
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2(-1000, -1000);
 let hoveredObject = null;
 let selectedObject = null;
+let isDragging = false;
+let draggedObject = null;
+const dragPlane = new THREE.Plane();
+const planeIntersectPoint = new THREE.Vector3();
+const dragOffset = new THREE.Vector3();
+const worldPos = new THREE.Vector3();
+
+// Helper to check if screen width supports visual helpers (>= 768px)
+const areHelpersAllowed = () => window.innerWidth >= 768;
 
 // UI Overlay for displaying complete raycasted Intersection information
 const infoCard = document.createElement("div");
@@ -204,16 +261,17 @@ infoCard.style.cssText = `
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 12.5px;
   line-height: 1.6;
-  min-width: 320px;
+  max-width: calc(100vw - 40px);
+  min-width: 280px;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
   pointer-events: none;
   z-index: 100;
 `;
 infoCard.innerHTML = `
-  <div style="font-size: 14px; font-weight: 700; color: #38bdf8; margin-bottom: 4px;">Raycast Intersection Data</div>
-  <div style="color: #64748b; font-size: 11px; margin-bottom: 8px;">Structure of THREE.Intersection Object</div>
+  <div style="font-size: 14px; font-weight: 700; color: #38bdf8; margin-bottom: 4px;">Raycast & Drag Interaction</div>
+  <div style="color: #64748b; font-size: 11px; margin-bottom: 8px;">Drag shapes in 3D space</div>
   <hr style="border: 0; border-top: 1px solid rgba(255, 255, 255, 0.1); margin: 6px 0 10px;" />
-  <div style="color: #94a3b8; font-weight: bold;">Intersection</div>
+  <div style="color: #94a3b8; font-weight: bold;">Intersection / Drag Target</div>
   <div style="padding-left: 10px;">
     <div>├── <b>object:</b> <span id="info-object" style="color: #f1f5f9;">None</span></div>
     <div>├── <b>distance:</b> <span id="info-dist" style="color: #fbbf24;">--</span></div>
@@ -222,7 +280,15 @@ infoCard.innerHTML = `
     <div>└── <b>uv:</b> <span id="info-uv" style="color: #f472b6;">--</span></div>
   </div>
   <hr style="border: 0; border-top: 1px solid rgba(255, 255, 255, 0.1); margin: 10px 0 6px;" />
-  <div style="font-size: 12px;"><b>Status:</b> <span id="info-status" style="color: #94a3b8;">Idle</span></div>
+  <div style="font-size: 12px; margin-bottom: 6px;"><b>Status:</b> <span id="info-status" style="color: #94a3b8;">Idle</span></div>
+  <div id="helper-legend-container" style="display: ${areHelpersAllowed() ? "block" : "none"};">
+    <hr style="border: 0; border-top: 1px solid rgba(255, 255, 255, 0.1); margin: 6px 0 6px;" />
+    <div style="font-size: 11px; color: #cbd5e1; line-height: 1.5;">
+      <div><b>Axes:</b> <span style="color:#f43f5e;">■ +X</span> | <span style="color:#22c55e;">■ +Y</span> | <span style="color:#3b82f6;">■ +Z</span></div>
+      <div><b>Arrow:</b> Camera direction / Normal</div>
+      <div><b>Plane Mesh:</b> Translucent drag plane</div>
+    </div>
+  </div>
 `;
 document.body.appendChild(infoCard);
 
@@ -232,27 +298,145 @@ const pointEl = document.getElementById("info-point");
 const faceEl = document.getElementById("info-face");
 const uvEl = document.getElementById("info-uv");
 const statusEl = document.getElementById("info-status");
+const helperLegendEl = document.getElementById("helper-legend-container");
 
-// Track pointer coordinates in Normalized Device Coordinates (-1 to +1)
+// Track pointer coordinates and handle active dragging in 3D (X, Y, Z)
 window.addEventListener("pointermove", (event) => {
   pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
   pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+  if (isDragging && draggedObject) {
+    raycaster.setFromCamera(pointer, camera);
+    if (raycaster.ray.intersectPlane(dragPlane, planeIntersectPoint)) {
+      const targetWorld = planeIntersectPoint.clone().add(dragOffset);
+      if (draggedObject.parent) {
+        draggedObject.parent.worldToLocal(targetWorld);
+        draggedObject.position.x = targetWorld.x;
+        draggedObject.position.y = Math.max(0.5, targetWorld.y); // Keep above floor
+        draggedObject.position.z = targetWorld.z;
+      } else {
+        draggedObject.position.x = targetWorld.x;
+        draggedObject.position.y = Math.max(0.5, targetWorld.y);
+        draggedObject.position.z = targetWorld.z;
+      }
+
+      // Update baseline elevation for floating animation
+      draggedObject.userData.baseY = draggedObject.position.y;
+
+      // Update positions of visual helpers if screen width is >= 768
+      if (areHelpersAllowed()) {
+        draggedObject.getWorldPosition(worldPos);
+        visualDragPlane.position.copy(worldPos);
+        arrowHelper.position.copy(worldPos);
+      }
+
+      pointEl.textContent = `(x: ${planeIntersectPoint.x.toFixed(2)}, y: ${draggedObject.position.y.toFixed(2)}, z: ${planeIntersectPoint.z.toFixed(2)})`;
+    }
+  }
 });
 
-// Click detection for selecting objects
-window.addEventListener("pointerdown", () => {
-  if (hoveredObject) {
-    if (selectedObject && selectedObject !== hoveredObject) {
+// Pointer down to initiate selection and 3D drag
+window.addEventListener("pointerdown", (event) => {
+  if (event.button !== 0) return; // Left mouse button only
+
+  pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+  pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+
+  const intersects = raycaster.intersectObjects(interactiveObjects);
+  if (intersects.length > 0) {
+    const hit = intersects[0];
+    const hitMesh = hit.object;
+
+    if (selectedObject && selectedObject !== hitMesh) {
       selectedObject.userData.isSelected = false;
       selectedObject.material.emissive.setHex(0x000000);
       selectedObject.scale.set(1, 1, 1);
     }
-    selectedObject = hoveredObject;
+    selectedObject = hitMesh;
     selectedObject.userData.isSelected = true;
-    selectedObject.position.y = selectedObject.userData.baseY + 0.4;
-    statusEl.innerHTML = `<span style="color: #facc15; font-weight: bold;">Selected</span>`;
+
+    // Start dragging
+    isDragging = true;
+    draggedObject = hitMesh;
+    controls.enabled = false; // Disable orbit controls during drag
+
+    draggedObject.getWorldPosition(worldPos);
+
+    // Create a camera-facing plane so moving mouse up/down elevates the object along Y
+    const cameraDir = new THREE.Vector3();
+    camera.getWorldDirection(cameraDir).negate();
+    dragPlane.setFromNormalAndCoplanarPoint(cameraDir, worldPos);
+
+    if (raycaster.ray.intersectPlane(dragPlane, planeIntersectPoint)) {
+      dragOffset.subVectors(worldPos, planeIntersectPoint);
+    }
+
+    // Only display visual plane mesh and camera direction arrow on screens >= 768px
+    if (areHelpersAllowed()) {
+      visualDragPlane.position.copy(worldPos);
+      visualDragPlane.quaternion.copy(camera.quaternion);
+      visualDragPlane.visible = true;
+
+      arrowHelper.position.copy(worldPos);
+      arrowHelper.setDirection(cameraDir.clone().normalize());
+      arrowHelper.visible = true;
+    } else {
+      visualDragPlane.visible = false;
+      arrowHelper.visible = false;
+    }
+
+    renderer.domElement.style.cursor = "grabbing";
+    document.body.style.cursor = "grabbing";
+    statusEl.innerHTML = `<span style="color: #f59e0b; font-weight: bold;">Dragging</span>`;
   }
 });
+
+// Optional scroll wheel adjustment for fine Y elevation control while dragging
+window.addEventListener(
+  "wheel",
+  (event) => {
+    if (isDragging && draggedObject) {
+      event.preventDefault();
+      draggedObject.position.y = Math.max(
+        0.5,
+        draggedObject.position.y - event.deltaY * 0.005,
+      );
+      draggedObject.userData.baseY = draggedObject.position.y;
+      if (areHelpersAllowed()) {
+        draggedObject.getWorldPosition(worldPos);
+        visualDragPlane.position.copy(worldPos);
+        arrowHelper.position.copy(worldPos);
+      }
+      pointEl.textContent = `(x: ${draggedObject.position.x.toFixed(2)}, y: ${draggedObject.position.y.toFixed(2)}, z: ${draggedObject.position.z.toFixed(2)})`;
+    }
+  },
+  { passive: false },
+);
+
+// Pointer up to release drag and restore controls
+function onPointerUp() {
+  if (isDragging) {
+    isDragging = false;
+    draggedObject = null;
+    controls.enabled = true;
+
+    // Hide visual drag helpers
+    visualDragPlane.visible = false;
+    arrowHelper.visible = false;
+
+    renderer.domElement.style.cursor = hoveredObject ? "grab" : "default";
+    document.body.style.cursor = hoveredObject ? "grab" : "default";
+    if (selectedObject) {
+      statusEl.innerHTML = `<span style="color: #facc15; font-weight: bold;">Selected</span>`;
+    } else {
+      statusEl.textContent = "Idle";
+    }
+  }
+}
+
+window.addEventListener("pointerup", onPointerUp);
+window.addEventListener("pointercancel", onPointerUp);
 
 // Clock for animation loop
 const clock = new THREE.Clock();
@@ -267,59 +451,61 @@ function animate() {
   // Smooth orbit controls
   controls.update();
 
-  // Perform Raycasting from camera through pointer coordinates
-  raycaster.setFromCamera(pointer, camera);
-  const intersects = raycaster.intersectObjects(interactiveObjects);
+  if (!isDragging) {
+    // Perform Raycasting from camera through pointer coordinates
+    raycaster.setFromCamera(pointer, camera);
+    const intersects = raycaster.intersectObjects(interactiveObjects);
 
-  if (intersects.length > 0) {
-    const hit = intersects[0];
-    const hitMesh = hit.object;
+    if (intersects.length > 0) {
+      const hit = intersects[0];
+      const hitMesh = hit.object;
 
-    renderer.domElement.style.cursor = "pointer";
-    document.body.style.cursor = "pointer";
+      renderer.domElement.style.cursor = "grab";
+      document.body.style.cursor = "grab";
 
-    if (hoveredObject !== hitMesh) {
+      if (hoveredObject !== hitMesh) {
+        if (hoveredObject && !hoveredObject.userData.isSelected) {
+          hoveredObject.material.emissive.setHex(0x000000);
+          hoveredObject.scale.set(1, 1, 1);
+        }
+        hoveredObject = hitMesh;
+      }
+
+      if (!hitMesh.userData.isSelected) {
+        hitMesh.material.emissive.setHex("red");
+        hitMesh.scale.set(1.1, 1.1, 1.1);
+      }
+
+      // Populate all 5 Intersection properties into UI
+      objectEl.textContent = `${hitMesh.userData.name} (${hitMesh.userData.type})`;
+      distEl.textContent = `${hit.distance.toFixed(3)} units`;
+      pointEl.textContent = `(x: ${hit.point.x.toFixed(2)}, y: ${hit.point.y.toFixed(2)}, z: ${hit.point.z.toFixed(2)})`;
+      faceEl.textContent = hit.face
+        ? `index ${hit.faceIndex} [norm: (${hit.face.normal.x.toFixed(1)}, ${hit.face.normal.y.toFixed(1)}, ${hit.face.normal.z.toFixed(1)})]`
+        : `index ${hit.faceIndex ?? "N/A"}`;
+      uvEl.textContent = hit.uv
+        ? `(u: ${hit.uv.x.toFixed(3)}, v: ${hit.uv.y.toFixed(3)})`
+        : "N/A";
+
+      if (!hitMesh.userData.isSelected) {
+        statusEl.innerHTML = `<span style="color: #38bdf8;">Hovering</span>`;
+      }
+    } else {
+      renderer.domElement.style.cursor = "default";
+      document.body.style.cursor = "default";
       if (hoveredObject && !hoveredObject.userData.isSelected) {
         hoveredObject.material.emissive.setHex(0x000000);
         hoveredObject.scale.set(1, 1, 1);
+        hoveredObject = null;
       }
-      hoveredObject = hitMesh;
-    }
-
-    if (!hitMesh.userData.isSelected) {
-      hitMesh.material.emissive.setHex(0x333333);
-      hitMesh.scale.set(1.1, 1.1, 1.1);
-    }
-
-    // Populate all 5 Intersection properties into UI
-    objectEl.textContent = `${hitMesh.userData.name} (${hitMesh.userData.type})`;
-    distEl.textContent = `${hit.distance.toFixed(3)} units`;
-    pointEl.textContent = `(x: ${hit.point.x.toFixed(2)}, y: ${hit.point.y.toFixed(2)}, z: ${hit.point.z.toFixed(2)})`;
-    faceEl.textContent = hit.face
-      ? `index ${hit.faceIndex} [norm: (${hit.face.normal.x.toFixed(1)}, ${hit.face.normal.y.toFixed(1)}, ${hit.face.normal.z.toFixed(1)})]`
-      : `index ${hit.faceIndex ?? "N/A"}`;
-    uvEl.textContent = hit.uv
-      ? `(u: ${hit.uv.x.toFixed(3)}, v: ${hit.uv.y.toFixed(3)})`
-      : "N/A";
-
-    if (!hitMesh.userData.isSelected) {
-      statusEl.innerHTML = `<span style="color: #38bdf8;">Hovering</span>`;
-    }
-  } else {
-    renderer.domElement.style.cursor = "default";
-    document.body.style.cursor = "default";
-    if (hoveredObject && !hoveredObject.userData.isSelected) {
-      hoveredObject.material.emissive.setHex(0x000000);
-      hoveredObject.scale.set(1, 1, 1);
-      hoveredObject = null;
-    }
-    if (!selectedObject) {
-      objectEl.textContent = "None";
-      distEl.textContent = "--";
-      pointEl.textContent = "--";
-      faceEl.textContent = "--";
-      uvEl.textContent = "--";
-      statusEl.textContent = "Idle";
+      if (!selectedObject) {
+        objectEl.textContent = "None";
+        distEl.textContent = "--";
+        pointEl.textContent = "--";
+        faceEl.textContent = "--";
+        uvEl.textContent = "--";
+        statusEl.textContent = "Idle";
+      }
     }
   }
 
@@ -329,7 +515,10 @@ function animate() {
     mesh.rotation.y += 0.8 * delta;
     mesh.rotation.x += 0.4 * delta;
 
-    if (mesh.userData.isSelected) {
+    if (mesh === draggedObject) {
+      mesh.material.emissive.setHex(0x553300);
+      mesh.scale.setScalar(1.2);
+    } else if (mesh.userData.isSelected) {
       mesh.material.emissive.setHex(0x443300);
       mesh.position.y = THREE.MathUtils.lerp(
         mesh.position.y,
@@ -359,4 +548,15 @@ window.addEventListener("resize", () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+  // Dynamically update visual helpers and HUD legend on breakpoint change
+  const allowed = areHelpersAllowed();
+  axesHelper.visible = allowed;
+  if (!allowed) {
+    visualDragPlane.visible = false;
+    arrowHelper.visible = false;
+  }
+  if (helperLegendEl) {
+    helperLegendEl.style.display = allowed ? "block" : "none";
+  }
 });
