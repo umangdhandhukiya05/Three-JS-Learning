@@ -138,3 +138,47 @@ export const LIGHT_COLOR_PRESETS = [
   { name: "Laser Red", hex: 0xef4444 },
   { name: "Pure White", hex: 0xffffff },
 ];
+
+// Animal models configuration (Deer, Horse, Horse_White, Husky, Wolf)
+export const ANIMAL_MODELS = [
+  {
+    name: "Deer",
+    path: "/models/common/Deer.gltf",
+    scale: 0.03,
+    position: { x: -0.65, z: 0.35 },
+    rotationY: 0.45,
+    defaultAnimation: "Idle_2",
+  },
+  {
+    name: "Horse",
+    path: "/models/common/Horse.gltf",
+    scale: 0.045,
+    position: { x: 0.65, z: -0.65 },
+    rotationY: -1.8,
+    defaultAnimation: "Eating",
+  },
+  {
+    name: "White Horse",
+    path: "/models/common/Horse_White.gltf",
+    scale: 0.045,
+    position: { x: 0.95, z: 0.4 },
+    rotationY: -2.4,
+    defaultAnimation: "Idle",
+  },
+  {
+    name: "Husky",
+    path: "/models/common/Husky.gltf",
+    scale: 0.03,
+    position: { x: -0.25, z: -0.55 },
+    rotationY: 0.4,
+    defaultAnimation: "Idle",
+  },
+  {
+    name: "Wolf",
+    path: "/models/common/Wolf.gltf",
+    scale: 0.03,
+    position: { x: -0.9, z: -0.75 },
+    rotationY: 0.4,
+    defaultAnimation: "Idle_2_HeadLow",
+  },
+];

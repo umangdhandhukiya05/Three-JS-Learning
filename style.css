@@ -8,7 +8,9 @@ body {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  background-color: #0a0e17;
+  background: #000008;
+  font-family: 'Outfit', sans-serif;
+  user-select: none;
 }
 
 canvas {

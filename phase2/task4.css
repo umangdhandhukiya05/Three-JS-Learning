@@ -1,0 +1,369 @@
+@import url("https://fonts.googleapis.com/css2?family=Outfit:ital,wght@0,400;0,600;0,700;0,900;1,900&family=Space+Mono:wght@400;700&display=swap");
+
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Outfit", sans-serif;
+  background: #000008;
+  overflow: hidden;
+  color: white;
+  user-select: none;
+}
+
+canvas {
+  position: fixed !important;
+  inset: 0;
+  z-index: 1;
+}
+
+/* ── Landing page hero ── */
+#landing-hero {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  text-align: center;
+  padding: 54px 24px 30px;
+  pointer-events: auto;
+  transition: opacity 0.5s ease;
+}
+
+.landing-title {
+  font-size: clamp(38px, 6.8vw, 86px);
+  font-weight: 900;
+  letter-spacing: -0.035em;
+  line-height: 0.95;
+  text-transform: uppercase;
+  margin-top: 8px;
+  margin-bottom: 14px;
+  background: linear-gradient(
+    180deg,
+    #ffffff 40%,
+    rgba(200, 225, 255, 0.75) 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 40px rgba(56, 189, 248, 0.35));
+}
+
+.landing-desc {
+  max-width: 500px;
+  font-size: clamp(12.5px, 1.3vw, 15px);
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.65);
+  margin-bottom: 22px;
+  font-weight: 400;
+}
+
+.landing-actions {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  pointer-events: auto;
+}
+
+#start-btn {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.14),
+    rgba(255, 255, 255, 0.05)
+  );
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: #ffffff;
+  padding: 16px 36px;
+  border-radius: 999px;
+  font-family: "Outfit", sans-serif;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  transition: all 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+#start-btn:hover {
+  background: #ffffff;
+  color: #000008;
+  border-color: #ffffff;
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 16px 40px rgba(56, 189, 248, 0.5);
+}
+
+#landing-hint {
+  position: absolute;
+  bottom: 34px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 9.5px;
+  letter-spacing: 0.3em;
+  font-weight: 600;
+  text-transform: uppercase;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: color 0.2s;
+}
+
+#landing-hint:hover {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.landing-scroll-mouse {
+  width: 22px;
+  height: 36px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-radius: 12px;
+  position: relative;
+}
+
+.mouse-wheel {
+  width: 3px;
+  height: 6px;
+  background: white;
+  border-radius: 2px;
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  animation: mouseWheel 2s infinite ease-in-out;
+}
+
+@keyframes mouseWheel {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, 14px);
+  }
+}
+
+/* ── Fixed overlay ── */
+#overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  padding: 44px 56px 44px 64px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/* ── Top bar ── */
+#top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+#label-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+#planet-subtitle {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+#planet-num {
+  font-size: 11px;
+  font-family: "Space Mono", monospace;
+  color: rgba(255, 255, 255, 0.22);
+  letter-spacing: 0.12em;
+}
+
+/* ── Info card ── */
+#info-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  border-radius: 20px;
+  padding: 28px 30px;
+  width: 310px;
+  flex-shrink: 0;
+  transition: opacity 0.3s;
+}
+
+#planet-description {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.58);
+  line-height: 1.8;
+  margin-bottom: 22px;
+}
+
+.fact-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 9px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  gap: 12px;
+}
+.fact-row:last-child {
+  border-bottom: none;
+}
+
+.fact-label {
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.28);
+  flex-shrink: 0;
+}
+
+.fact-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.88);
+  text-align: right;
+}
+
+/* ── Bottom bar ── */
+#bottom-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+#planet-name {
+  font-size: clamp(68px, 14vw, 170px);
+  font-weight: 900;
+  font-style: italic;
+  color: white;
+  letter-spacing: -0.04em;
+  line-height: 0.86;
+  text-transform: uppercase;
+  text-shadow: 0 0 120px rgba(255, 255, 255, 0.12);
+  pointer-events: none;
+}
+
+#scroll-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 9px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  padding-bottom: 6px;
+  transition:
+    opacity 0.5s,
+    color 0.2s;
+  pointer-events: auto;
+  cursor: pointer;
+}
+#scroll-hint:hover {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.scroll-arrow {
+  width: 1px;
+  height: 52px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(255, 255, 255, 0.35)
+  );
+  animation: scrollPulse 2.2s ease-in-out infinite;
+}
+
+@keyframes scrollPulse {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scaleY(0.7);
+  }
+  50% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+/* ── Progress nav ── */
+#progress {
+  position: fixed;
+  right: 26px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  pointer-events: auto;
+}
+
+.dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  cursor: pointer;
+  transition: all 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.dot:hover {
+  background: rgba(255, 255, 255, 0.55);
+  transform: scale(1.4);
+}
+.dot.active {
+  background: white;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
+  transform: scale(1.9);
+}
+
+/* ── Flash transition ── */
+#flash {
+  position: fixed;
+  inset: 0;
+  background: #000008;
+  z-index: 100;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.22s ease;
+}
+#flash.show {
+  opacity: 1;
+}
+
+/* ── Edge vignette ── */
+#vignette {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at 50% 50%,
+    transparent 38%,
+    rgba(0, 0, 4, 0.72) 100%
+  );
+}
