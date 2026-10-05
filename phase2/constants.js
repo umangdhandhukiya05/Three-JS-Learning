@@ -181,12 +181,4 @@ export const ANIMAL_MODELS = [
     rotationY: 0.4,
     defaultAnimation: "Idle_2_HeadLow",
   },
-  {
-    name: "Human",
-    path: "/models/common/human.glb",
-    scale: 0.035,
-    position: { x: 0.25, z: -0.2 },
-    rotationY: -1.2,
-    defaultAnimation: "ArmatureAction",
-  },
 ];
