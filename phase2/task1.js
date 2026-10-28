@@ -1,7 +1,6 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader.js";
-import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
 import gsap from "gsap";
 import { COMMON_MODELS, ANIMAL_MODELS, LIGHT_COLOR_PRESETS } from "./constants.js";
 
@@ -34,8 +33,8 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
-// Flashlight spotlight beam (starts OFF, toggled by switch button)
-const torchBeam = new THREE.SpotLight(0xfff3cc, 0, 4, Math.PI / 5, 0.4, 1.2);
+// Flashlight spotlight beam (starts ON by default in dark/night mode)
+const torchBeam = new THREE.SpotLight(0xfff3cc, 25, 4, Math.PI / 5, 0.4, 1.2);
 torchBeam.castShadow = true;
 torchBeam.shadow.mapSize.set(1024, 1024);
 
@@ -52,15 +51,18 @@ function updateDayNightMode() {
     scene.background = new THREE.Color(0xffffff);
     scene.fog = new THREE.FogExp2(0xffffff, 0.15);
     rimLight.intensity = 0.4;
-    console.log("[Day/Night] Mode: DAY ☀️ (HDR Environment ON | White Background)");
+    console.log("[Day/Night] Mode: DAY (HDR Environment ON | White Background)");
   } else {
     // Night Mode: No HDR Environment + Black Background
     scene.environment = null;
     scene.background = new THREE.Color(0x000000);
     scene.fog = new THREE.FogExp2(0x000000, 0.4);
     rimLight.intensity = 1.0;
-    console.log("[Day/Night] Mode: NIGHT 🌙 (HDR Environment OFF | Black Background)");
+    console.log("[Day/Night] Mode: NIGHT (HDR Environment OFF | Black Background)");
+    // By default torch is ON in dark/night mode
+    setTorchLight(true);
   }
+  updateHUD();
 }
 
 // HDR Environment Map Loader (IBL - Image Based Lighting for PBR reflections & lighting)
@@ -127,24 +129,8 @@ floor.position.y = -0.1;
 floor.receiveShadow = true;
 scene.add(floor);
 
-// 3D Axes Helper: Coordinate system visualization (Red = +X, Green = +Y, Blue = +Z)
-const axesHelper = new THREE.AxesHelper(3);
-axesHelper.position.set(0, -0.099, 0);
-axesHelper.renderOrder = 1;
-scene.add(axesHelper);
-
-// 5. Transform Controls: Interactive 3D manipulation gizmo
-const transformControls = new TransformControls(camera, renderer.domElement);
-transformControls.size = 0.75;
-scene.add(transformControls.getHelper());
-
-let isTransforming = false;
-transformControls.addEventListener("dragging-changed", (event) => {
-  isTransforming = event.value;
-});
-
-// Keyboard shortcuts for Axes & Transform Controls, Day/Night, and Animal Animations:
-// 'Space' = Toggle Day/Night, 'X' = Toggle Axes, 'T' = Translate, 'R' = Rotate, 'Y' = Scale, 'C' = Toggle Space, 'V' = Snapping, 'H' = Toggle Gizmo
+// Keyboard shortcuts for Day/Night and Animal Animations:
+// 'Space' = Toggle Day/Night
 // Keys '1'-'8' = Trigger Animal Animations:
 // [1: Idle, 2: Walk, 3: Gallop/Run, 4: Jump, 5: Headbutt/Attack, 6: Kick, 7: Eating, 8: Death]
 window.addEventListener("keydown", (event) => {
@@ -189,49 +175,21 @@ window.addEventListener("keydown", (event) => {
     return;
   }
 
-  const key = event.key.toLowerCase();
-  if (key === "x") {
-    axesHelper.visible = !axesHelper.visible;
-    console.log(`[Axes Control] Axes Helper Visible: ${axesHelper.visible}`);
-  } else if (key === "t") {
-    transformControls.setMode("translate");
-    console.log("[TransformControls] Mode: Translate (Move)");
-  } else if (key === "r") {
-    transformControls.setMode("rotate");
-    console.log("[TransformControls] Mode: Rotate");
-  } else if (key === "y") {
-    transformControls.setMode("scale");
-    console.log("[TransformControls] Mode: Scale");
-  } else if (key === "c") {
-    const nextSpace = transformControls.space === "local" ? "world" : "local";
-    transformControls.setSpace(nextSpace);
-    console.log(`[TransformControls] Coordinate Space: ${nextSpace.toUpperCase()}`);
-  } else if (key === "v") {
-    const isSnapping = transformControls.translationSnap !== null;
-    transformControls.setTranslationSnap(isSnapping ? null : 0.25);
-    transformControls.setRotationSnap(
-      isSnapping ? null : THREE.MathUtils.degToRad(15),
-    );
-    transformControls.setScaleSnap(isSnapping ? null : 0.1);
-    console.log(
-      `[TransformControls] Snapping: ${!isSnapping ? "ON (0.25m / 15°)" : "OFF"}`,
-    );
-  } else if (key === "h") {
-    transformControls.enabled = !transformControls.enabled;
-    transformControls.getHelper().visible = transformControls.enabled;
-    console.log(
-      `[TransformControls] Gizmo Visible: ${transformControls.enabled}`,
-    );
-  }
 });
 
-// WASD / Arrow keys tracking for torchModel movement
+// WASD / Arrow keys tracking for torchModel movement & HUD key highlight
 const keysPressed = {};
 window.addEventListener("keydown", (event) => {
   keysPressed[event.key.toLowerCase()] = true;
+  const searchKey = event.code === "Space" ? "space" : event.key.toLowerCase();
+  const keyEl = document.querySelector(`kbd[data-key="${searchKey}"]`);
+  if (keyEl) keyEl.classList.add("is-pressed");
 });
 window.addEventListener("keyup", (event) => {
   keysPressed[event.key.toLowerCase()] = false;
+  const searchKey = event.code === "Space" ? "space" : event.key.toLowerCase();
+  const keyEl = document.querySelector(`kbd[data-key="${searchKey}"]`);
+  if (keyEl) keyEl.classList.remove("is-pressed");
 });
 
 // Animation state: initial GSAP sequence flag
@@ -277,7 +235,7 @@ gltfLoader.load(
       bodyMesh.material.metalness = 0.5;
     }
 
-    // Customize glass lens with physical refraction
+    // Customize glass lens with physical refraction & default emissive glow
     if (glassMesh) {
       glassMesh.material = new THREE.MeshPhysicalMaterial({
         color: new THREE.Color(0xffffff),
@@ -287,6 +245,8 @@ gltfLoader.load(
         transmission: 0.9,
         ior: 1.5,
         depthWrite: false,
+        emissive: new THREE.Color(LIGHT_COLOR_PRESETS[currentLightColorIndex].hex),
+        emissiveIntensity: 1.5,
       });
     }
 
@@ -296,7 +256,7 @@ gltfLoader.load(
       color: 0xd90429,
       roughness: 0.25,
       metalness: 0.15,
-      emissive: 0x660000,
+      emissive: 0x22c55e,
       emissiveIntensity: 0.3,
     });
     buttonMesh = new THREE.Mesh(buttonGeo, buttonMat);
@@ -316,8 +276,8 @@ gltfLoader.load(
 
     scene.add(torchModel);
 
-    // Attach TransformControls to the loaded torch model
-    transformControls.attach(torchModel);
+    // Ensure initial torch lighting state is applied
+    setTorchLight(true);
 
     // Initial transform setup before GSAP sequence triggers
     torchModel.position.set(0, 0.4, 0.6);
@@ -589,10 +549,89 @@ const mouse = new THREE.Vector2();
 const targetTorchRotation = { x: 0, y: 0 };
 
 let hoveredMesh = null;
-let isTorchLightOn = false;
+let isTorchLightOn = true;
 let currentLightColorIndex = 0;
 
 torchBeam.color.set(LIGHT_COLOR_PRESETS[currentLightColorIndex].hex);
+
+/**
+ * Updates torch spotlight intensity, lens emissive glow, switch button, and HUD
+ * @param {boolean} on - Desired torch power state
+ */
+function setTorchLight(on) {
+  isTorchLightOn = on;
+  torchBeam.intensity = isTorchLightOn ? 25 : 0;
+  const currentColor = LIGHT_COLOR_PRESETS[currentLightColorIndex];
+
+  if (glassMesh) {
+    if (isTorchLightOn) {
+      glassMesh.material.emissive = new THREE.Color(currentColor.hex);
+      glassMesh.material.emissiveIntensity = 1.5;
+    } else {
+      glassMesh.material.emissive = new THREE.Color(0x000000);
+      glassMesh.material.emissiveIntensity = 0;
+    }
+  }
+
+  if (buttonMesh) {
+    buttonMesh.material.emissive = new THREE.Color(isTorchLightOn ? 0x22c55e : 0x990000);
+  }
+
+  updateHUD();
+}
+
+// Minimalist Guidance Dock HUD Controller
+const envStatusDot = document.getElementById("envStatusDot");
+const envStatusText = document.getElementById("envStatusText");
+const torchStatusDot = document.getElementById("torchStatusDot");
+const torchStatusText = document.getElementById("torchStatusText");
+const beamColorPreview = document.getElementById("beamColorPreview");
+const guidanceDock = document.getElementById("guidanceDock");
+const dockCollapseBtn = document.getElementById("dockCollapseBtn");
+const dockExpandPill = document.getElementById("dockExpandPill");
+
+function updateHUD() {
+  if (envStatusDot && envStatusText) {
+    if (isDayMode) {
+      envStatusDot.className = "status-dot day-mode";
+      envStatusText.textContent = "Day";
+    } else {
+      envStatusDot.className = "status-dot";
+      envStatusText.textContent = "Night";
+    }
+  }
+
+  if (torchStatusDot && torchStatusText) {
+    if (isTorchLightOn) {
+      torchStatusDot.className = "status-dot torch-on";
+      torchStatusText.textContent = "Active";
+    } else {
+      torchStatusDot.className = "status-dot torch-off";
+      torchStatusText.textContent = "Standby";
+    }
+  }
+
+  if (beamColorPreview) {
+    const currentColor = LIGHT_COLOR_PRESETS[currentLightColorIndex];
+    const hexStr = "#" + currentColor.hex.toString(16).padStart(6, "0");
+    beamColorPreview.style.backgroundColor = hexStr;
+    beamColorPreview.style.boxShadow = `0 0 6px ${hexStr}88`;
+  }
+}
+
+if (dockCollapseBtn && guidanceDock && dockExpandPill) {
+  dockCollapseBtn.addEventListener("click", () => {
+    guidanceDock.classList.add("is-collapsed");
+    dockExpandPill.classList.add("is-active");
+  });
+
+  dockExpandPill.addEventListener("click", () => {
+    guidanceDock.classList.remove("is-collapsed");
+    dockExpandPill.classList.remove("is-active");
+  });
+}
+
+updateHUD();
 
 // Camera orbit variables (click and drag)
 let isMouseDown = false;
@@ -632,22 +671,7 @@ window.addEventListener("mouseup", (event) => {
             ease: "power2.inOut",
           });
 
-          isTorchLightOn = !isTorchLightOn;
-          torchBeam.intensity = isTorchLightOn ? 25 : 0;
-
-          const currentColor = LIGHT_COLOR_PRESETS[currentLightColorIndex];
-
-          if (glassMesh) {
-            if (isTorchLightOn) {
-              glassMesh.material.emissive = new THREE.Color(currentColor.hex);
-              glassMesh.material.emissiveIntensity = 1.5;
-              clickedMesh.material.emissive = new THREE.Color(0x22c55e);
-            } else {
-              glassMesh.material.emissive = new THREE.Color(0x000000);
-              glassMesh.material.emissiveIntensity = 0;
-              clickedMesh.material.emissive = new THREE.Color(0x990000);
-            }
-          }
+          setTorchLight(!isTorchLightOn);
 
           console.log(
             `[Button Clicked] Flashlight: ${isTorchLightOn ? "ON" : "OFF"}`,
@@ -696,14 +720,12 @@ window.addEventListener("mousemove", (event) => {
 
   if (isIntroAnimating) return;
 
-  // 1. Pointer move: rotate and aim torch flashlight light (disabled during transform gizmo drag)
-  if (!isTransforming) {
-    targetTorchRotation.y = -mouse.x * Math.PI * 0.5;
-    targetTorchRotation.x = -mouse.y * 0.4;
-  }
+  // 1. Pointer move: rotate and aim torch flashlight light
+  targetTorchRotation.y = -mouse.x * Math.PI * 0.5;
+  targetTorchRotation.x = -mouse.y * 0.4;
 
   // 2. Mouse click & drag: rotate / orbit camera position around torch
-  if (isMouseDown && !isTransforming) {
+  if (isMouseDown) {
     hasDragged = true;
     cameraOrbitYaw -= event.movementX * 0.006;
     cameraOrbitPitch += event.movementY * 0.006;
@@ -769,6 +791,7 @@ window.addEventListener("dblclick", () => {
   }
 
   console.log("Light Beam Color:", newColor.name, newColor.hex);
+  updateHUD();
 });
 
 // Movement speeds associated with each animation state (Units per second)
@@ -821,13 +844,11 @@ function animate() {
         torchModel.position.z,
       );
     } else {
-      // 1. Smoothly rotate torch towards pointer aim (when not actively using transform gizmo)
-      if (!isTransforming) {
-        torchModel.rotation.y +=
-          (targetTorchRotation.y - torchModel.rotation.y) * 0.08;
-        torchModel.rotation.x +=
-          (targetTorchRotation.x - torchModel.rotation.x) * 0.08;
-      }
+      // 1. Smoothly rotate torch towards pointer aim
+      torchModel.rotation.y +=
+        (targetTorchRotation.y - torchModel.rotation.y) * 0.08;
+      torchModel.rotation.x +=
+        (targetTorchRotation.x - torchModel.rotation.x) * 0.08;
 
       // 2. WASD movement relative to camera view
       const torchSpeed = 0.02;

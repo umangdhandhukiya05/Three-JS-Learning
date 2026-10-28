@@ -3,13 +3,97 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Phase 3 - Task 3: Interactive Vintage Lighter</title>
+  <title>Interactive 3D Searchlight & Wildlife Exploration</title>
   <link rel="stylesheet" href="/style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
+
+  <!-- Minimalist HUD Guidance Dock -->
+  <nav class="guidance-dock" id="guidanceDock" aria-label="Controls guidance">
+    <!-- Live Status Indicators -->
+    <div class="dock-section">
+      <div class="status-indicator">
+        <span class="status-dot" id="envStatusDot"></span>
+        <span class="status-label" id="envStatusText">Night</span>
+      </div>
+      <div class="status-indicator">
+        <span class="status-dot torch-on" id="torchStatusDot"></span>
+        <span class="status-label" id="torchStatusText">Active</span>
+      </div>
+    </div>
+
+    <div class="dock-divider"></div>
+
+    <!-- Movement & Aim Controls -->
+    <div class="dock-section">
+      <div class="control-item">
+        <span class="keys-cluster">
+          <kbd data-key="w">W</kbd>
+          <kbd data-key="a">A</kbd>
+          <kbd data-key="s">S</kbd>
+          <kbd data-key="d">D</kbd>
+        </span>
+        <span class="control-text">Move</span>
+      </div>
+      <div class="control-item">
+        <span class="key-mouse">Pointer</span>
+        <span class="control-text">Aim</span>
+      </div>
+    </div>
+
+    <div class="dock-divider"></div>
+
+    <!-- View & Lighting Controls -->
+    <div class="dock-section">
+      <div class="control-item">
+        <kbd data-key="space">Space</kbd>
+        <span class="control-text">Time</span>
+      </div>
+      <div class="control-item">
+        <span class="key-mouse">Drag</span>
+        <span class="control-text">Orbit</span>
+      </div>
+      <div class="control-item">
+        <span class="key-mouse">Dbl-Click</span>
+        <span class="control-text">Color</span>
+        <span class="color-preview" id="beamColorPreview"></span>
+      </div>
+    </div>
+
+    <div class="dock-divider"></div>
+
+    <!-- Wildlife Animation Controls -->
+    <div class="dock-section">
+      <div class="control-item">
+        <span class="keys-cluster">
+          <kbd data-key="1">1</kbd><span class="range-sep">–</span><kbd data-key="8">8</kbd>
+        </span>
+        <span class="control-text">Actions</span>
+      </div>
+      <div class="control-item">
+        <span class="key-mouse">Click Animal</span>
+        <span class="control-text">Pose</span>
+      </div>
+    </div>
+
+    <!-- Collapse Toggle -->
+    <button type="button" class="dock-collapse-btn" id="dockCollapseBtn" title="Hide guidance dock" aria-label="Hide guidance dock">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+  </nav>
+
+  <!-- Expand Button (revealed when dock is hidden) -->
+  <button type="button" class="dock-expand-pill" id="dockExpandPill" aria-label="Show controls guidance">
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M2.5 7.5L6 4L9.5 7.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span>Controls</span>
+  </button>
 
   <script type="module" src="/phase2/task1.js"></script>
 
